@@ -16,3 +16,8 @@ T3（確認）
 source /opt/ros/jazzy/setup.bash  
 source ~/pin_ws/install/setup.bash    
 ros2 topic echo /cmd_vel
+
+
+ビルド
+cd ~/pin_ws  
+colcon build --packages-select pin_recognition --symlink-install  
