@@ -18,6 +18,6 @@ source ~/pin_ws/install/setup.bash
 ros2 topic echo /cmd_vel
 
 
-ビルド
+ビルド  
 cd ~/pin_ws  
 colcon build --packages-select pin_recognition --symlink-install  
