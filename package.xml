@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>pin_recognition</name>
+  <version>0.0.0</version>
+  <description>Pin tracking node for ROS2 Jazzy</description>
+
+  <maintainer email="example@example.com">yoshipi</maintainer>
+  <license>Apache-2.0</license>
+
+  <!-- ビルドツール -->
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- 実行時依存（必要に応じてあとで増やせばOK） -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+
+  <!-- テスト系（必須ではないがテンプレとして） -->
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
