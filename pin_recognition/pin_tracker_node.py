@@ -143,8 +143,13 @@ class PinTrackerNode(Node):
         self.image_sub = self.create_subscription(
             Image, self.image_topic, self.image_callback, qos_profile_sensor_data
         )
-        self.cmd_pub = self.create_publisher(Twist, "/cmd_vel", 10)
-        self.annotated_pub = self.create_publisher(Image, "/pin_tracker/annotated", 10)
+
+        # タイマー: 10Hz (0.1秒) ごとに計算・出力
+        timer_period = 0.1  
+        self.timer = self.create_timer(timer_period, self.timer_callback)
+
+        self.cmd_pub = self.create_publisher(Twist, "/cmd_vel", 1)
+        self.annotated_pub = self.create_publisher(Image, "/pin_tracker/annotated", 1)
 
         self.frame_count = 0
 
@@ -466,18 +471,18 @@ class PinTrackerNode(Node):
 
     # -------------------------
     # ROS callback
-    # -------------------------
+    # ------------------------- 
     def image_callback(self, msg: Image):
-        self.frame_count += 1
-
         try:
-            bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            self.bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except Exception as e:
             self.get_logger().error(f"cv_bridge error: {e}")
-            return
 
-        H, W = bgr.shape[:2]
-        annotated, cx, dist = self.detect_pin(bgr)
+    def timer_callback(self):
+        self.frame_count += 1
+
+        H, W = self.bgr.shape[:2]
+        annotated, cx, dist = self.detect_pin(self.bgr)
 
         if self.publish_annotated:
             try:
@@ -491,7 +496,7 @@ class PinTrackerNode(Node):
             try:
                 cv2.imshow("pin_tracker_annotated", annotated)
                 if self.tune_hsv:
-                    cv2.imshow("pin_red_preview", cv2.cvtColor(self.make_red_mask(bgr), cv2.COLOR_GRAY2BGR))
+                    cv2.imshow("pin_red_preview", cv2.cvtColor(self.make_red_mask(self.bgr), cv2.COLOR_GRAY2BGR))
                 cv2.waitKey(1)
             except Exception:
                 pass
