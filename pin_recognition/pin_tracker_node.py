@@ -11,7 +11,7 @@ from rclpy.qos import qos_profile_sensor_data
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
-
+from linear_motor_msgs.srv import Mode
 
 def clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
@@ -143,6 +143,12 @@ class PinTrackerNode(Node):
         self.image_sub = self.create_subscription(
             Image, self.image_topic, self.image_callback, qos_profile_sensor_data
         )
+
+    
+        self.srv = self.create_service(Mode, 'tracker_mode', self.srv_callback)
+        self.mode = 'OFF'
+
+        self.bgr = None
 
         # タイマー: 10Hz (0.1秒) ごとに計算・出力
         timer_period = 0.1  
@@ -472,13 +478,24 @@ class PinTrackerNode(Node):
     # -------------------------
     # ROS callback
     # ------------------------- 
+    def srv_callback(self, request, response):
+        if request.mode == 'tracker_START':
+            self.mode = 'ON'
+        if request.mode == 'tracker_STOP':
+            self.mode = 'OFF'
+        return response
+
     def image_callback(self, msg: Image):
         try:
             self.bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            self.header = msg.header
         except Exception as e:
             self.get_logger().error(f"cv_bridge error: {e}")
 
     def timer_callback(self):
+        if not hasattr(self, 'bgr') or self.bgr is None or self.mode == 'OFF':
+            return
+
         self.frame_count += 1
 
         H, W = self.bgr.shape[:2]
@@ -487,7 +504,7 @@ class PinTrackerNode(Node):
         if self.publish_annotated:
             try:
                 out = self.bridge.cv2_to_imgmsg(annotated, encoding="bgr8")
-                out.header = msg.header
+                out.header = self.header
                 self.annotated_pub.publish(out)
             except Exception as e:
                 self.get_logger().warn(f"annotated publish error: {e}")
