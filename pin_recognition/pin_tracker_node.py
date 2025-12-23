@@ -89,6 +89,7 @@ class WhiteFollowerNode(Node):
         self.declare_parameter("max_angular_speed", 0.4)
         self.declare_parameter("linear_speed", 1.0)
         self.declare_parameter("search_yaw_rate", 0.3)         # 見失った時（0なら停止）
+        self.calib = True
 
         # -------------------------
         # Read params
@@ -117,6 +118,10 @@ class WhiteFollowerNode(Node):
         self.max_angular_speed = float(self.get_parameter("max_angular_speed").value)
         self.linear_speed = float(self.get_parameter("linear_speed").value)
         self.search_yaw_rate = float(self.get_parameter("search_yaw_rate").value)
+
+        self.declare_parameter("keep_straight_duration", 3.0) # 何秒間直進し続けるか
+        self.keep_straight_duration = self.get_parameter("keep_straight_duration").value
+        self.last_detected_time = 0.0 # 最後に認識した時刻（ROSの時刻）
 
         # -------------------------
         # ROS I/O
@@ -295,15 +300,50 @@ class WhiteFollowerNode(Node):
                 pass
 
         # control
+        now_sec = self.get_clock().now().nanoseconds / 1e9  # 現在時刻(秒)
+
+        # ターゲットを認識できた場合、時刻を更新
+        if detected and cx is not None:
+            self.last_detected_time = now_sec
+
+        # 「直進を維持する時間内」かどうかを判定
+        is_searching = (now_sec - self.last_detected_time) > self.keep_straight_duration
+        
         twist = Twist()
-        if not detected or cx is None:
+
+        if is_searching:
+            # 【探索モード】5秒以上見つからないので、止まって旋回
             twist.linear.x = 0.0
             twist.angular.z = float(self.search_yaw_rate)
+            self.calib = True
         else:
-            err = (float(cx) - (W / 2.0)) / (W / 2.0)  # -1..1
-            wz = -self.angular_gain * err
-            twist.angular.z = float(clamp(wz, -self.max_angular_speed, self.max_angular_speed))
-            twist.linear.x = float(self.linear_speed)
+            # 【直進・追従モード】見つけてから5秒以内
+            if self.calib and detected:
+                # 最初に発見した瞬間だけのキャリブレーション動作
+                twist.linear.x = 0.0
+                twist.angular.z = -1.0 * float(self.search_yaw_rate)
+                self.calib = False
+            else:
+                # ★ここがメインの直進★
+                # 見えていれば cx で計算できるが、見失っていても linear.x を出す
+                twist.linear.x = float(self.linear_speed)
+                twist.angular.z = 0.0
+
+#        if not detected or cx is None and not is_keep_straight:
+#           twist.linear.x = 0.0
+#            twist.angular.z = float(self.search_yaw_rate)
+#            self.calib = True
+#        else:
+ #           if self.calib is True:
+  #              twist.linear.x = 0.0
+   #             twist.angular.z = -1.0*float(self.search_yaw_rate)
+    #            self.calib = False
+     #       else:
+      #          err = (float(cx) - (W / 2.0)) / (W / 2.0)  # -1..1
+       #         wz = -self.angular_gain * err
+                #twist.angular.z = float(clamp(wz, -self.max_angular_speed, self.max_angular_speed))
+        #        twist.angular.z = 0.0
+         #       twist.linear.x = float(self.linear_speed)
 
         self.cmd_pub.publish(twist)
 
